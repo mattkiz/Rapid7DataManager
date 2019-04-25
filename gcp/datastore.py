@@ -3,7 +3,7 @@ from ipaddress import IPv4Address
 import threading
 
 
-DEBUG=True
+DEBUG=False
 client = datastore.Client()
 
 
@@ -21,7 +21,7 @@ def create_url_metadata(meta_data, source="rapid7", testing=DEBUG):
 
 # __key_lock = threading.Lock()
 
-def create_url_metadata_multi(meta_datas, source="rapid7", testing=DEBUG, excluded_indicies=None):
+def create_url_metadata_multi(meta_datas, testing=DEBUG, excluded_indicies=None):
     with client.transaction():
         key = client.key("url_metadata")
         keys = client.allocate_ids(key, len(meta_datas))

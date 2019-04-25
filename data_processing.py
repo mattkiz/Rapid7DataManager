@@ -1,16 +1,12 @@
 import sys
-import queue
-import threading
 import multiprocessing
 import subprocess
 import collections
 import re
-import signal
 from gcp.datastore import *
-from gcp.storage import *
 from rapid7 import *
 import cloud_upload
-
+import datetime
 
 NUM_THREADS=8
 
@@ -23,6 +19,12 @@ max_chunks = 5000
 
 def get_datas(x):
     return x.pop("data", None)
+
+
+def attach_more_metadata(x, other_metadata):
+    for k, v in other_metadata.items():
+        x[k] = v
+    return x
 
 
 def save_chunk_sem(q:collections.deque, stop:threading.Event, sem:threading.Semaphore, run_info, storage_q):
@@ -45,7 +47,9 @@ def save_chunk_sem(q:collections.deque, stop:threading.Event, sem:threading.Sema
         curr_chunks = collections.deque()
         while len(chunks) > 0:
             if c == 499:
-                json_objs = collections.deque(map(json.loads, curr_chunks))
+                json_objs = map(json.loads, curr_chunks)
+                json_objs = map(lambda x: attach_more_metadata(x, run_info["other_metadata"]), json_objs)
+                json_objs = collections.deque(json_objs)
                 data = collections.deque(map(lambda x: get_datas(x), json_objs))
                 keys = create_url_metadata_multi(json_objs, excluded_indicies=run_info["excluded_indices"])
                 zipped_data = zip(data, map(lambda x: x[1], keys))
@@ -83,15 +87,16 @@ def unpack_file(fileobj):
     download_url = fileobj["url"]
     run_info = {}
     run_info["updated_at"] = fileobj["updated_at"]
+    run_info["other_metadata"] = {"updated_at": run_info["updated_at"], "extracted_on": datetime.date.today().strftime("%Y-%m-%d"),
+                                  "source": "rapid7"}
     run_info["port"] = int(re.search(r"\_(\d+)\.json", fileobj["name"]).group(1))
     run_info["http_https"] = re.search(r"\/sonar\.(.+)\/", download_url).group(1)
-    run_info["excluded_indices"] = ["host", "path", "subject", "vhost"]
+    run_info["excluded_indices"] = ["host", "path", "subject", "vhost", "extracted_on"]
     p = subprocess.Popen(["curl {0} --keepalive-time 2 | gunzip -c".format(download_url)],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     storage_q = multiprocessing.Queue()
     storage_stop = multiprocessing.Event()
-    storage_p = multiprocessing.Process(target=cloud_upload.main, args=[storage_q, storage_stop, run_info["port"], run_info["http_https"]])
-    # storage_p = threading.Thread(target=cloud_upload.main, args=[storage_q, storage_stop, run_info["port"], run_info["http_https"]])
+    storage_p = multiprocessing.Process(target=cloud_upload.main, args=[storage_q, storage_stop, run_info])
     storage_p.start()
     q = collections.deque()
 
