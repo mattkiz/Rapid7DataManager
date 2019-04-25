@@ -5,7 +5,7 @@ import gzip
 import shutil
 import os
 
-MaxEntries = 100000
+MaxEntries = 10000
 filenum = 0
 files_toupload = []
 NUM_UPLOAD_THREADS = 3
@@ -14,7 +14,7 @@ name_lock = threading.Lock()
 
 def upload_thread(filename, port, http_https):
     compressed_filename = '{0}.gz'.format(filename)
-    print("compressing {0} to {1}".format(filename, compressed_filename))
+    # print("compressing {0} to {1}".format(filename, compressed_filename))
     with open(filename, 'rb') as f_in:
         f_out = gzip.open(compressed_filename, 'wb+')
         shutil.copyfileobj(f_in, f_out)
