@@ -46,15 +46,17 @@ def save_chunk_sem(q:queue.Queue, stop:threading.Event, lock:threading.Lock, run
         while True:
             if c == 499:
                 json_objs = map(json.loads, curr_chunks)
-                data = map(lambda x: get_datas(x), json_objs)
-
                 json_objs = map(lambda x: attach_more_metadata(x, run_info["other_metadata"]), json_objs)
                 json_objs = collections.deque(json_objs)
-
+                data = []
+                objs_size = len(json_objs)
+                for i in range(objs_size):
+                    objs = json_objs.popleft()
+                    data.append(objs.pop("data", None))
+                    json_objs.append(objs)
                 keys = create_url_metadata_multi(json_objs, excluded_indicies=run_info["excluded_indices"])
                 zipped_data = zip(data, map(lambda x: x[1], keys))
                 for z in zipped_data:
-                    print(z)
                     storage_q.put("{0},{1}\n".format(z[0], z[1]))
                 curr_chunks = collections.deque()
                 size += c
@@ -66,8 +68,15 @@ def save_chunk_sem(q:queue.Queue, stop:threading.Event, lock:threading.Lock, run
             curr_chunks.append(entity)
             c +=1
         size += c
-        json_objs = collections.deque(map(json.loads, chunks))
-        data = collections.deque(map(lambda x: get_datas(x), json_objs))
+        json_objs = map(json.loads, curr_chunks)
+        json_objs = map(lambda x: attach_more_metadata(x, run_info["other_metadata"]), json_objs)
+        json_objs = collections.deque(json_objs)
+        data = []
+        objs_size = len(json_objs)
+        for i in range(objs_size):
+            objs = json_objs.popleft()
+            data.append(objs.pop("data", None))
+            json_objs.append(objs)
         keys = create_url_metadata_multi(json_objs, excluded_indicies=run_info["excluded_indices"])
         zipped_data = zip(data, map(lambda x: x[1], keys))
         for z in zipped_data:

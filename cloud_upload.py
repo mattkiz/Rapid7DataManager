@@ -55,7 +55,7 @@ def csv_save(in_q, prefix, stop, port, updated_at):
             f = open(filename, "w")
             i = 0
         i+=1
-        f.write(item.decode("utf-8"))
+        f.write(item)
         stat_lock.acquire()
         n+=1
         stat_lock.release()

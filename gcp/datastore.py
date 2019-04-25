@@ -23,22 +23,22 @@ def create_url_metadata(meta_data, source="rapid7", testing=DEBUG):
 # __key_lock = threading.Lock()
 
 def create_url_metadata_multi(meta_datas, testing=DEBUG, excluded_indicies=None):
-    try:
-        with client.transaction():
-            key = client.key("url_metadata")
-            keys = client.allocate_ids(key, len(meta_datas))
-            entities = []
-            for i in range(len(meta_datas)):
-                e = datastore.Entity(keys[i], exclude_from_indexes=excluded_indicies)
-                meta_datas[i].pop("data", None)
-                e.update(meta_datas[i])
-                entities.append(e)
-            if not testing:
-                    client.put_multi(entities)
-    except google.cloud.exceptions.InvalidArgument:
-        for e in entities:
+    with client.transaction():
+        key = client.key("url_metadata")
+        keys = client.allocate_ids(key, len(meta_datas))
+        entities = []
+        for i in range(len(meta_datas)):
+            e = datastore.Entity(keys[i], exclude_from_indexes=excluded_indicies)
+            # meta_datas[i].pop("data", None)
+            e.update(meta_datas[i])
+            entities.append(e)
+        if not testing:
             try:
-                client.put(e)
-            except google.cloud.exceptions.InvalidArgument:
-                continue
-    return list(map(lambda x: x.flat_path, keys))
+                client.put_multi(entities)
+            except Exception:
+                for e in entities:
+                    try:
+                        client.put(e)
+                    except Exception:
+                        continue
+        return list(map(lambda x: x.flat_path, keys))
