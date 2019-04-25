@@ -72,10 +72,9 @@ def main(data_q, stop:multiprocessing.Event, run_info):
     port = run_info["port"]
     updated_at = run_info["updated_at"]
     file_stop = threading.Event()
-    file_lock = threading.Lock()
     threads=[]
     for i in range(NUM_UPLOAD_THREADS):
-        t = threading.Thread(target=csv_save, args=[data_q, "out_", file_stop, file_lock, port, updated_at])
+        t = threading.Thread(target=csv_save, args=[data_q, "out_", file_stop, port, updated_at])
         t.start()
         threads.append(t)
     print("Starting to read stdin...")

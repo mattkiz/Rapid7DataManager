@@ -4,7 +4,7 @@ storage_client = storage.Client()
 
 HTTP_RAW_DATA_BUCKET = storage_client.bucket("rapid7_raw_data")
 
-DEBUG=False
+DEBUG=True
 
 
 def save_file_to_cloud(filename, name, testing=DEBUG):
