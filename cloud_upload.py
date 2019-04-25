@@ -5,7 +5,10 @@ import gzip
 import shutil
 import os
 import multiprocessing
-
+import queue
+import time
+n = 0
+stat_lock = threading.Lock()
 MaxEntries = 10000
 filenum = 0
 files_toupload = []
@@ -24,8 +27,8 @@ def upload_thread(filename, port, updated_at):
     os.remove(compressed_filename)
 
 
-def csv_save(in_q, prefix, stop, lock:threading.Lock, port, updated_at):
-    global filenum
+def csv_save(in_q, prefix, stop, port, updated_at):
+    global filenum, n, stat_lock
     name_lock.acquire()
     filename = "output/{0}{1}.csv".format(prefix, filenum)
     filenum += 1
@@ -33,13 +36,13 @@ def csv_save(in_q, prefix, stop, lock:threading.Lock, port, updated_at):
     f = open(filename, "w")
     i = 0
     threads = []
-    while not stop.is_set():
-        lock.acquire()
-        if len(in_q) == 0:
-            lock.release()
+    while True:
+        try:
+            item = in_q.get(block=False)
+        except queue.Empty:
+            if stop.is_set():
+                break
             continue
-        item = in_q.popleft()
-        lock.release()
         if i > MaxEntries:
             f.close()
             t = threading.Thread(target=upload_thread, args=[filename, port, updated_at])
@@ -52,7 +55,11 @@ def csv_save(in_q, prefix, stop, lock:threading.Lock, port, updated_at):
             f = open(filename, "w")
             i = 0
         i+=1
-        f.write(item)
+        f.write(item.decode("utf-8"))
+        stat_lock.acquire()
+        n+=1
+        stat_lock.release()
+        in_q.task_done()
     print("got stop... exiting other threads...")
     f.close()
     upload_thread(filename, port, updated_at)
@@ -60,34 +67,22 @@ def csv_save(in_q, prefix, stop, lock:threading.Lock, port, updated_at):
         t.join()
 
 
-def main(data_q, stop, run_info):
+def main(data_q, stop:multiprocessing.Event, run_info):
     global filenum
     port = run_info["port"]
     updated_at = run_info["updated_at"]
-    main_q = deque()
     file_stop = threading.Event()
     file_lock = threading.Lock()
     threads=[]
     for i in range(NUM_UPLOAD_THREADS):
-        t = threading.Thread(target=csv_save, args=[main_q, "out_", file_stop, file_lock, port, updated_at])
+        t = threading.Thread(target=csv_save, args=[data_q, "out_", file_stop, file_lock, port, updated_at])
         t.start()
         threads.append(t)
     print("Starting to read stdin...")
-    i = 0
-    while not stop.is_set():
-        if data_q.empty():
-            continue
-        main_q.append(data_q.get().decode("utf-8"))
-        if i % 100000 == 0:
-            print("upload has gotten {0}".format(i))
-        i+=1
-    while not data_q.empty():
-        main_q.append(data_q.get().decode("utf-8"))
-        if i % 100000 == 0:
-            print("upload has gotten {0}".format(i))
-        i+=1
-    while len(main_q) > 0:
-        continue
+    stop.wait()
+    print("Got stop signal from parent")
+    data_q.join()
     file_stop.set()
     for t in threads:
         t.join()
+    print("read {0} requests".format(n))
