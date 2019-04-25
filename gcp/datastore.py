@@ -7,6 +7,7 @@ DEBUG=True
 client = datastore.Client()
 
 
+
 def create_url_metadata(meta_data, source="rapid7", testing=DEBUG):
     with client.transaction():
         key = client.key("url_metadata")
@@ -20,15 +21,13 @@ def create_url_metadata(meta_data, source="rapid7", testing=DEBUG):
 
 # __key_lock = threading.Lock()
 
-def create_url_metadata_multi(meta_datas, source="rapid7", testing=DEBUG):
+def create_url_metadata_multi(meta_datas, source="rapid7", testing=DEBUG, excluded_indicies=None):
     with client.transaction():
         key = client.key("url_metadata")
-        # __key_lock.acquire()
         keys = client.allocate_ids(key, len(meta_datas))
-        # __key_lock.release()
         entities = []
         for i in range(len(meta_datas)):
-            e = datastore.Entity(keys[i])
+            e = datastore.Entity(keys[i], exclude_from_indexes=excluded_indicies)
             e.update(meta_datas[i])
             entities.append(e)
         if not testing:

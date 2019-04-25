@@ -4,7 +4,12 @@ storage_client = storage.Client()
 
 HTTP_RAW_DATA_BUCKET = storage_client.bucket("http_raw_data")
 
-DEBUG=True
+DEBUG=False
+
+def save_file_to_cloud(filename, name, testing=DEBUG):
+    blob = HTTP_RAW_DATA_BUCKET.blob(name)
+    if not testing:
+        blob.upload_from_filename(filename)
 
 def save_data_to_cloud(encoded_str, name, testing=DEBUG):
     blob = HTTP_RAW_DATA_BUCKET.blob(name)
